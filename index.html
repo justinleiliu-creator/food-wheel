@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>今天吃什么 · 长沙口味转盘</title>
+<style>
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:linear-gradient(135deg,#fff7ed,#fee2e2);
+    color:#1f2937;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .app{
+    width:min(980px,100%);
+    background:rgba(255,255,255,.92);
+    border-radius:24px;
+    box-shadow:0 20px 60px rgba(0,0,0,.12);
+    padding:24px;
+  }
+  h1{margin:0 0 6px;font-size:30px}
+  .sub{color:#6b7280;margin-bottom:20px}
+  .grid{
+    display:grid;
+    grid-template-columns:minmax(300px,1fr) minmax(280px,.8fr);
+    gap:24px;
+  }
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .wheel-wrap{
+    position:relative;
+    width:min(520px,90vw);
+    aspect-ratio:1;
+    margin:auto;
+  }
+  canvas{
+    width:100%;
+    height:100%;
+    display:block;
+    filter:drop-shadow(0 10px 18px rgba(0,0,0,.15));
+  }
+  .pointer{
+    position:absolute;
+    top:50%;
+    right:-2px;
+    transform:translateY(-50%);
+    width:0;height:0;
+    border-top:18px solid transparent;
+    border-bottom:18px solid transparent;
+    border-right:0;
+    border-left:34px solid #111827;
+    z-index:3;
+  }
+  .center{
+    position:absolute;
+    inset:50% auto auto 50%;
+    transform:translate(-50%,-50%);
+    width:96px;height:96px;
+    background:#111827;
+    color:white;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    font-weight:800;
+    cursor:pointer;
+    user-select:none;
+    box-shadow:0 8px 18px rgba(0,0,0,.25);
+  }
+  .panel{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .result{
+    border-radius:18px;
+    padding:18px;
+    background:#111827;
+    color:#fff;
+    text-align:center;
+  }
+  .result small{opacity:.72}
+  .result strong{display:block;font-size:26px;margin-top:8px}
+  button{
+    border:none;
+    border-radius:14px;
+    padding:13px 16px;
+    font-size:16px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .primary{background:#ef4444;color:#fff}
+  .secondary{background:#f3f4f6;color:#111827}
+  .danger{background:#fff1f2;color:#be123c}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
+  .filters{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  select,label{
+    font-size:14px;
+  }
+  select{
+    width:100%;
+    margin-top:5px;
+    padding:10px 12px;
+    border:1px solid #d1d5db;
+    border-radius:12px;
+    background:#fff;
+  }
+  .history{
+    max-height:220px;
+    overflow:auto;
+    background:#f9fafb;
+    border-radius:14px;
+    padding:12px;
+    font-size:14px;
+  }
+  .history b{display:block;margin-bottom:8px}
+  .tag{
+    display:inline-block;
+    padding:5px 8px;
+    margin:3px;
+    border-radius:999px;
+    background:#fff;
+    border:1px solid #e5e7eb;
+  }
+  .note{
+    font-size:13px;
+    color:#6b7280;
+    line-height:1.5;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>今天吃什么 · 长沙口味转盘 🌶️</h1>
+  <div class="sub">湘味优先，也混了全国常见好吃的。抽过的菜会进入“近期历史”，优先避免重复。</div>
+
+  <div class="grid">
+    <div class="wheel-wrap">
+      <canvas id="wheel" width="700" height="700"></canvas>
+      <div class="pointer"></div>
+      <div class="center" id="spinCenter">点我<br>开转</div>
+    </div>
+
+    <div class="panel">
+      <div class="result">
+        <small>今天就吃</small>
+        <strong id="resultText">还没抽</strong>
+      </div>
+
+      <div class="filters">
+        <label>类型
+          <select id="typeFilter">
+            <option value="all">全部</option>
+            <option value="正餐">正餐</option>
+            <option value="粉面">粉面</option>
+            <option value="夜宵">夜宵</option>
+            <option value="小吃">小吃</option>
+            <option value="清淡">清淡</option>
+          </select>
+        </label>
+        <label>辣度
+          <select id="spicyFilter">
+            <option value="all">随便</option>
+            <option value="辣">想吃辣</option>
+            <option value="不辣">今天不辣</option>
+          </select>
+        </label>
+      </div>
+
+      <button class="primary" id="spinBtn">🎡 随机转一次</button>
+
+      <div class="row">
+        <button class="secondary" id="againBtn">不想吃，再来</button>
+        <button class="danger" id="resetBtn">清空历史</button>
+      </div>
+
+      <div class="history" id="historyBox">
+        <b>最近抽到</b>
+        <div id="historyList">暂无</div>
+      </div>
+
+      <div class="note">
+        规则：优先从最近没抽到过的食物里选；当可选项快被抽完时会自动放开旧记录，所以不容易连续重复。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const foods = [
+  // 湘菜 / 长沙口味
+  ["辣椒炒肉","正餐","辣"],["小炒黄牛肉","正餐","辣"],["剁椒鱼头","正餐","辣"],
+  ["口味虾","夜宵","辣"],["口味蟹","夜宵","辣"],["口味花甲","夜宵","辣"],
+  ["酱板鸭","小吃","辣"],["臭豆腐","小吃","辣"],["糖油粑粑","小吃","不辣"],
+  ["刮凉粉","小吃","辣"],["猪油拌粉","粉面","不辣"],["长沙米粉","粉面","不辣"],
+  ["牛肉米粉","粉面","辣"],["肉丝米粉","粉面","不辣"],["酸辣粉","粉面","辣"],
+  ["嗦螺","夜宵","辣"],["烧烤","夜宵","辣"],["烤牛油","夜宵","辣"],
+  ["烤五花肉","夜宵","辣"],["烤鸡翅","夜宵","辣"],["烤韭菜","夜宵","辣"],
+  ["铁板鱿鱼","夜宵","辣"],["炸串","夜宵","辣"],["麻辣烫","正餐","辣"],
+  ["麻辣香锅","正餐","辣"],["干锅牛蛙","正餐","辣"],["干锅花菜","正餐","辣"],
+  ["干锅肥肠","正餐","辣"],["香辣虾","正餐","辣"],["香辣蟹","正餐","辣"],
+  ["农家一碗香","正餐","辣"],["腊肉炒香干","正餐","辣"],["腊肉炒笋","正餐","辣"],
+  ["外婆菜炒蛋","正餐","辣"],["酸豆角炒肉末","正餐","辣"],["香干炒肉","正餐","辣"],
+  ["擂辣椒皮蛋","正餐","辣"],["爆炒腰花","正餐","辣"],["红烧肉","正餐","不辣"],
+  ["毛氏红烧肉","正餐","不辣"],["土匪猪肝","正餐","辣"],["小炒鸡杂","正餐","辣"],
+  ["啤酒鸭","正餐","辣"],["血鸭","正餐","辣"],["柴火鸡","正餐","辣"],
+  ["黄焖鸡","正餐","不辣"],["辣子鸡","正餐","辣"],["泡椒牛蛙","正餐","辣"],
+  ["水煮牛肉","正餐","辣"],["水煮鱼","正餐","辣"],["酸菜鱼","正餐","辣"],
+  ["烤鱼","正餐","辣"],["纸包鱼","正餐","辣"],["钵钵鸡","小吃","辣"],
+  ["串串香","正餐","辣"],["重庆火锅","正餐","辣"],["牛油火锅","正餐","辣"],
+  ["鸳鸯火锅","正餐","不辣"],["冒菜","正餐","辣"],["螺蛳粉","粉面","辣"],
+  ["桂林米粉","粉面","不辣"],["常德牛肉粉","粉面","辣"],["衡阳鱼粉","粉面","辣"],
+  ["云南过桥米线","粉面","不辣"],["重庆小面","粉面","辣"],["担担面","粉面","辣"],
+  ["热干面","粉面","不辣"],["牛肉面","粉面","不辣"],["兰州拉面","粉面","不辣"],
+  ["炸酱面","粉面","不辣"],["葱油拌面","粉面","不辣"],["番茄鸡蛋面","粉面","不辣"],
+  ["刀削面","粉面","不辣"],["油泼面","粉面","辣"],["biangbiang面","粉面","辣"],
+  ["牛肉河粉","粉面","不辣"],["炒河粉","粉面","不辣"],["炒米粉","粉面","辣"],
+
+  // 家常菜
+  ["青椒肉丝","正餐","辣"],["鱼香肉丝","正餐","辣"],["宫保鸡丁","正餐","辣"],
+  ["回锅肉","正餐","辣"],["麻婆豆腐","正餐","辣"],["番茄炒蛋","正餐","不辣"],
+  ["土豆丝","正餐","不辣"],["酸辣土豆丝","正餐","辣"],["地三鲜","正餐","不辣"],
+  ["红烧茄子","正餐","不辣"],["红烧排骨","正餐","不辣"],["糖醋排骨","正餐","不辣"],
+  ["糖醋里脊","正餐","不辣"],["可乐鸡翅","正餐","不辣"],["三杯鸡","正餐","不辣"],
+  ["香菇滑鸡","正餐","不辣"],["梅菜扣肉","正餐","不辣"],["蒜苔炒肉","正餐","不辣"],
+  ["芹菜炒牛肉","正餐","辣"],["韭黄炒蛋","正餐","不辣"],["孜然牛肉","正餐","辣"],
+  ["孜然羊肉","正餐","辣"],["黑椒牛柳","正餐","不辣"],["铁板牛肉","正餐","辣"],
+  ["椒盐排骨","正餐","不辣"],["椒盐虾","正餐","不辣"],["红烧鱼","正餐","不辣"],
+  ["清蒸鱼","清淡","不辣"],["清蒸鲈鱼","清淡","不辣"],["白灼虾","清淡","不辣"],
+  ["蒜蓉粉丝虾","正餐","不辣"],["蒜蓉生蚝","夜宵","不辣"],["蒜蓉扇贝","夜宵","不辣"],
+
+  // 米饭 / 盖饭
+  ["黄焖鸡米饭","正餐","不辣"],["隆江猪脚饭","正餐","不辣"],["卤肉饭","正餐","不辣"],
+  ["烧鸭饭","正餐","不辣"],["叉烧饭","正餐","不辣"],["海南鸡饭","正餐","不辣"],
+  ["咖喱鸡饭","正餐","不辣"],["咖喱牛肉饭","正餐","不辣"],["牛肉盖饭","正餐","不辣"],
+  ["照烧鸡饭","正餐","不辣"],["韩式拌饭","正餐","辣"],["石锅拌饭","正餐","辣"],
+  ["炒饭","正餐","不辣"],["扬州炒饭","正餐","不辣"],["蛋炒饭","正餐","不辣"],
+  ["牛肉炒饭","正餐","不辣"],["腊肠炒饭","正餐","不辣"],["煲仔饭","正餐","不辣"],
+  ["排骨煲仔饭","正餐","不辣"],["牛腩饭","正餐","不辣"],["烤肉饭","正餐","辣"],
+
+  // 粤式 / 港式
+  ["烧鹅","正餐","不辣"],["白切鸡","清淡","不辣"],["豉油鸡","正餐","不辣"],
+  ["叉烧","正餐","不辣"],["烧肉","正餐","不辣"],["云吞面","粉面","不辣"],
+  ["干炒牛河","粉面","不辣"],["艇仔粥","清淡","不辣"],["皮蛋瘦肉粥","清淡","不辣"],
+  ["肠粉","小吃","不辣"],["虾饺","小吃","不辣"],["烧卖","小吃","不辣"],
+  ["叉烧包","小吃","不辣"],["菠萝包","小吃","不辣"],["鸡蛋仔","小吃","不辣"],
+
+  // 东北 / 西北 / 北方
+  ["锅包肉","正餐","不辣"],["地锅鸡","正餐","辣"],["铁锅炖","正餐","不辣"],
+  ["小鸡炖蘑菇","正餐","不辣"],["猪肉炖粉条","正餐","不辣"],["酸菜白肉","正餐","不辣"],
+  ["烤羊肉串","夜宵","辣"],["羊肉泡馍","正餐","不辣"],["肉夹馍","小吃","不辣"],
+  ["凉皮","小吃","辣"],["臊子面","粉面","辣"],["葫芦头泡馍","正餐","不辣"],
+  ["驴肉火烧","小吃","不辣"],["饺子","正餐","不辣"],["锅贴","小吃","不辣"],
+  ["生煎包","小吃","不辣"],["小笼包","小吃","不辣"],["馄饨","粉面","不辣"],
+
+  // 日韩 / 东南亚
+  ["日式拉面","粉面","不辣"],["豚骨拉面","粉面","不辣"],["寿司","清淡","不辣"],
+  ["刺身","清淡","不辣"],["天妇罗","正餐","不辣"],["日式咖喱饭","正餐","不辣"],
+  ["鳗鱼饭","正餐","不辣"],["亲子丼","正餐","不辣"],["照烧鸡腿饭","正餐","不辣"],
+  ["韩式炸鸡","正餐","辣"],["部队锅","正餐","辣"],["韩式烤肉","正餐","辣"],
+  ["泡菜五花肉","正餐","辣"],["辣炒年糕","小吃","辣"],["冷面","粉面","不辣"],
+  ["越南河粉","粉面","不辣"],["泰式炒河粉","粉面","不辣"],["冬阴功","正餐","辣"],
+  ["海南鸡","正餐","不辣"],["新加坡叻沙","粉面","辣"],["马来西亚椰浆饭","正餐","辣"],
+
+  // 西式 / 快餐
+  ["汉堡","正餐","不辣"],["炸鸡汉堡","正餐","不辣"],["牛肉汉堡","正餐","不辣"],
+  ["炸鸡","正餐","不辣"],["披萨","正餐","不辣"],["意大利面","正餐","不辣"],
+  ["肉酱意面","正餐","不辣"],["奶油意面","正餐","不辣"],["牛排","正餐","不辣"],
+  ["烤鸡","正餐","不辣"],["炸鱼薯条","正餐","不辣"],["墨西哥卷饼","正餐","辣"],
+  ["塔可","正餐","辣"],["凯撒沙拉","清淡","不辣"],["鸡胸肉沙拉","清淡","不辣"],
+
+  // 清淡 / 不知道吃啥时兜底
+  ["鸡蛋蔬菜粥","清淡","不辣"],["南瓜粥","清淡","不辣"],["小米粥","清淡","不辣"],
+  ["蒸蛋","清淡","不辣"],["水煮鸡胸肉","清淡","不辣"],["鸡胸肉饭","清淡","不辣"],
+  ["清汤牛肉面","清淡","不辣"],["蔬菜汤","清淡","不辣"],["番茄牛腩汤","清淡","不辣"],
+  ["冬瓜排骨汤","清淡","不辣"],["玉米排骨汤","清淡","不辣"],["菌菇鸡汤","清淡","不辣"],
+
+  // 小吃 / 夜宵扩展
+  ["烤冷面","小吃","辣"],["手抓饼","小吃","不辣"],["煎饼果子","小吃","不辣"],
+  ["鸡蛋灌饼","小吃","不辣"],["章鱼小丸子","小吃","不辣"],["炸年糕","小吃","辣"],
+  ["炸鸡柳","小吃","不辣"],["盐酥鸡","小吃","辣"],["鸡排","小吃","不辣"],
+  ["烤红薯","小吃","不辣"],["玉米烙","小吃","不辣"],["炸蘑菇","小吃","不辣"],
+  ["烤茄子","夜宵","辣"],["烤生蚝","夜宵","不辣"],["烤扇贝","夜宵","不辣"],
+  ["烤脑花","夜宵","辣"],["烤鸡爪","夜宵","辣"],["烤猪蹄","夜宵","辣"],
+  ["麻辣小龙虾","夜宵","辣"],["卤味拼盘","夜宵","辣"],["鸭脖","小吃","辣"],
+  ["鸭架","小吃","辣"],["卤鸡爪","小吃","辣"],["泡椒凤爪","小吃","辣"]
+];
+
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+const resultText = document.getElementById("resultText");
+const typeFilter = document.getElementById("typeFilter");
+const spicyFilter = document.getElementById("spicyFilter");
+const historyList = document.getElementById("historyList");
+
+let currentRotation = 0;
+let spinning = false;
+let history = JSON.parse(localStorage.getItem("foodHistory") || "[]");
+
+function getFiltered(){
+  const t = typeFilter.value;
+  const s = spicyFilter.value;
+  return foods.filter(f => (t==="all" || f[1]===t) && (s==="all" || f[2]===s));
+}
+
+function getPool(){
+  const filtered = getFiltered();
+  const recentWindow = Math.min(40, Math.max(12, Math.floor(filtered.length * 0.35)));
+  const recent = new Set(history.slice(0,recentWindow));
+  let pool = filtered.filter(f => !recent.has(f[0]));
+  if(pool.length < Math.min(8, filtered.length)) pool = filtered;
+  return pool;
+}
+
+function drawWheel(){
+  const list = getFiltered();
+  const cx = canvas.width/2, cy = canvas.height/2, r = 320;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const visible = list.length > 36 ? 36 : list.length;
+  const sample = [];
+  if(list.length <= visible){
+    sample.push(...list);
+  } else {
+    const step = list.length/visible;
+    for(let i=0;i<visible;i++) sample.push(list[Math.floor(i*step)]);
+  }
+
+  const n = sample.length || 1;
+  for(let i=0;i<n;i++){
+    const a0 = (i/n)*Math.PI*2;
+    const a1 = ((i+1)/n)*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,a0,a1);
+    ctx.closePath();
+    ctx.fillStyle = i%2===0 ? "#ef4444" : "#f97316";
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate((a0+a1)/2);
+    ctx.textAlign="right";
+    ctx.fillStyle="#fff";
+    ctx.font="bold 20px system-ui";
+    const name = sample[i]?.[0] || "没东西";
+    ctx.fillText(name.length>7 ? name.slice(0,7)+"…" : name, r-18, 7);
+    ctx.restore();
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx,cy,118,0,Math.PI*2);
+  ctx.fillStyle="#111827";
+  ctx.fill();
+}
+
+function updateHistory(){
+  historyList.innerHTML = history.length
+    ? history.slice(0,18).map(x=>`<span class="tag">${x}</span>`).join("")
+    : "暂无";
+}
+
+function chooseFood(){
+  const pool = getPool();
+  if(!pool.length) return null;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function spin(){
+  if(spinning) return;
+  const selected = chooseFood();
+  if(!selected){
+    resultText.textContent = "没有符合条件的食物";
+    return;
+  }
+  spinning = true;
+  resultText.textContent = "转盘正在决定…";
+
+  const extraTurns = 6 + Math.floor(Math.random()*4);
+  const randomDeg = Math.floor(Math.random()*360);
+  currentRotation += extraTurns*360 + randomDeg;
+
+  canvas.style.transition = "transform 3.8s cubic-bezier(.17,.67,.13,1)";
+  canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+  setTimeout(()=>{
+    resultText.textContent = selected[0];
+    history = [selected[0], ...history.filter(x=>x!==selected[0])].slice(0,80);
+    localStorage.setItem("foodHistory", JSON.stringify(history));
+    updateHistory();
+    spinning = false;
+  },3900);
+}
+
+document.getElementById("spinBtn").onclick = spin;
+document.getElementById("spinCenter").onclick = spin;
+document.getElementById("againBtn").onclick = spin;
+
+document.getElementById("resetBtn").onclick = ()=>{
+  history = [];
+  localStorage.removeItem("foodHistory");
+  updateHistory();
+  resultText.textContent = "历史已清空";
+};
+
+typeFilter.onchange = drawWheel;
+spicyFilter.onchange = drawWheel;
+
+drawWheel();
+updateHistory();
+</script>
+</body>
+</html>
